@@ -1,0 +1,15 @@
+[package]
+name = "rust-native-emd"
+version = "0.1.0"
+authors = ["Jeongmin Byun <jmbyun91@gmail.com>"]
+description = "A library for computing the Earth Mover's Distance implemented in Rust"
+repository = "https://github.com/tanker-fund/rust-native-emd"
+license = "MIT"
+edition = "2021"
+build = "build.rs"
+links = "emd"
+
+[dependencies]
+lazy_static = "1.4.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
