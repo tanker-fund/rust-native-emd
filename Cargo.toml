@@ -12,4 +12,7 @@ links = "emd"
 [dependencies]
 lazy_static = "1.4.0"
 
+[features]
+debug-msg = []
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

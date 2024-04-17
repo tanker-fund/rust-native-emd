@@ -74,11 +74,15 @@ fn initialize_flow(weight_x: &Vec<f64>, weight_y: &Vec<f64>) -> Basis {
         }
     }
 
-    print_basis(&basis);
+    #[cfg(feature = "debug-msg")]
+    {    
+        print_basis(&basis);
+    }
 
     basis
 }
 
+#[cfg(feature = "debug-msg")]
 fn print_basis(basis: &Basis) {
     println!("::BASIS::");
     for i in 0..basis.len() {
@@ -219,10 +223,13 @@ pub fn emd(
         solved_x[var_ref.borrow().row] = true;
 
         loop {
-            println!("dual_x");
-            println!("{:?}", dual_x);
-            println!("dual_y");
-            println!("{:?}", dual_y);
+            #[cfg(feature = "debug-msg")]
+            {
+                println!("dual_x");
+                println!("{:?}", dual_x);
+                println!("dual_y");
+                println!("{:?}", dual_y);
+            }
             let update_var_ref: BasicRef;
             {
                 let mut var = var_ref.borrow_mut();
@@ -310,8 +317,11 @@ pub fn emd(
             break;
         }
 
-        println!("Before introducing a new variable");
-        print_basis(&basis);
+        #[cfg(feature = "debug-msg")]
+        {
+            println!("Before introducing a new variable");
+            print_basis(&basis);
+        }
 
         // Introduce a new variable
         let mut new_var_ref = init_basic(min_row, min_col, 0.0);
@@ -392,8 +402,11 @@ pub fn emd(
             new_var_ref = update_var_ref;
         }
 
-        println!("Before Finding the largest flow");
-        print_basis(&basis);
+        #[cfg(feature = "debug-msg")]
+        {
+            println!("Before Finding the largest flow");
+            print_basis(&basis);
+        }
 
         // Find the largest flow that can be subtracted
         let mut sign = -1.0;
@@ -436,8 +449,11 @@ pub fn emd(
             loop_var_ref = update_var_ref;
         }
 
-        println!("Before adjust flows");
-        print_basis(&basis);
+        #[cfg(feature = "debug-msg")]
+        {
+            println!("Before adjust flows");
+            print_basis(&basis);
+        }
 
         // Adjust flows
         sign = -1.0;
@@ -457,7 +473,6 @@ pub fn emd(
             {
                 let mut var = loop_var_ref.borrow_mut();
                 var.flow += sign * min_flow;
-                println!("New var flow: {:?}", var.flow);
                 sign *= -1.0;
 
                 match var.back {
@@ -475,8 +490,11 @@ pub fn emd(
             loop_var_ref = update_var_ref;
         }
 
-        println!("Before remove");
-        print_basis(&basis);
+        #[cfg(feature = "debug-msg")]
+        {
+            println!("Before remove");
+            print_basis(&basis);
+        }
 
         // Remove the basic variable that went to zero
         if let Some(var_to_remove) = to_remove {
@@ -490,8 +508,11 @@ pub fn emd(
         distance += basic.flow * cost[basic.row][basic.col];
     }
 
-    println!("Last");
-    print_basis(&basis);
+    #[cfg(feature = "debug-msg")]
+    {    
+        println!("Last");
+        print_basis(&basis);
+    }
 
     distance
 }
@@ -530,12 +551,12 @@ mod tests {
         let y = vec![3., 4.];
         assert_eq!(distance(&x, &y), 0.);
 
-        // let x = vec![4., 3.];
-        // let y = vec![3., 5.];
-        // assert_eq!(distance(&x, &y), 0.5);
+        let x = vec![4., 3.];
+        let y = vec![3., 5.];
+        assert_eq!(distance(&x, &y), 0.5);
 
-        // let x = vec![2., 4.];
-        // let y = vec![3., 5.];
-        // assert_eq!(distance(&x, &y), 1.);
+        let x = vec![2., 4.];
+        let y = vec![3., 5.];
+        assert_eq!(distance(&x, &y), 1.);
     }
 }
