@@ -32,7 +32,7 @@ struct Basic {
 type BasicRef = Rc<RefCell<Basic>>;
 type Basis = Vec<BasicRef>;
 
-fn initialize_flow(weight_x: &Vec<f64>, weight_y: &Vec<f64>, cost: &Vec<Vec<f64>>) -> Basis {
+fn initialize_flow(weight_x: &Vec<f64>, weight_y: &Vec<f64>) -> Basis {
     let n_x = weight_x.len();
     let n_y = weight_y.len();
     let mut basis: Basis = Vec::new();
@@ -41,9 +41,8 @@ fn initialize_flow(weight_x: &Vec<f64>, weight_y: &Vec<f64>, cost: &Vec<Vec<f64>
     let mut fx: usize = 0;
     let mut fy: usize = 0;
     let mut b: usize = 0;
-    let b_max: usize = n_x + n_y - 1;
 
-    while b < b_max {
+    loop {
         if fx == (n_x - 1) {
             for fy in fy..n_y {
                 let basic = init_basic(fx, fy, remaining_y[fy]);
@@ -81,12 +80,13 @@ fn initialize_flow(weight_x: &Vec<f64>, weight_y: &Vec<f64>, cost: &Vec<Vec<f64>
 fn init_basic(row: usize, col: usize, flow: f64) -> BasicRef {
     let mut id_guard = CURRENT_NODE_ID.lock().unwrap();
     *id_guard += 1;
+    println!("id: {:?}, row: {:?}, col: {:?}, flow: {:?}", *id_guard, row, col, flow);
     Rc::new(RefCell::new(Basic {
         id: *id_guard,
         row,
         col,
         flow,
-        adjacency: Vec::<Rc<RefCell<Basic>>>::new(),
+        adjacency: Vec::<BasicRef>::new(),
         cursor: None,
         back: None,
         color: Color::WHITE,
@@ -96,7 +96,7 @@ fn init_basic(row: usize, col: usize, flow: f64) -> BasicRef {
 fn insert_basic(basis: &mut Basis, index: usize, node_ref: &BasicRef) {
     if basis.len() < index {
         panic!("Index is to large");
-    } else if basis.len() <= index {
+    } else if basis.len() == index {
         basis.push(Rc::clone(node_ref));
     } else {
         basis[index] = Rc::clone(node_ref);
@@ -133,6 +133,7 @@ fn remove_basic(basis: &mut Basis, index: usize, node_ref: &BasicRef) {
         for j in 0..adj_node.adjacency.len() {
             if adj_node.adjacency[j].borrow().id == node_id {
                 remove_index = Some(j);
+                break;
             }
         }
 
@@ -143,6 +144,8 @@ fn remove_basic(basis: &mut Basis, index: usize, node_ref: &BasicRef) {
                 adj_node.adjacency[i] = Rc::clone(&adj_node.adjacency[i + 1]);
             }
             adj_node.adjacency.pop();
+        } else {
+            panic!("Must have the node");
         }
     }
 
@@ -170,7 +173,7 @@ pub fn emd(
     let n_x = weight_x.len();
     let n_y = weight_y.len();
 
-    let mut basis = initialize_flow(weight_x, weight_y, cost);
+    let mut basis = initialize_flow(weight_x, weight_y);
 
     // Iterate until optimality conditions satisfied
     let mut dual_x = vec![0.0; n_x];
@@ -178,7 +181,7 @@ pub fn emd(
     let mut solved_x = vec![false; n_x];
     let mut solved_y = vec![false; n_y];
 
-    let b = (n_x + n_y - 1) as usize;
+    let b = n_x + n_y - 1;
 
     loop {
         for i in 0..n_x {
@@ -196,7 +199,6 @@ pub fn emd(
         loop {
             let update_var_ref: BasicRef;
             {
-                let mut adj_cursor: Option<usize> = None;
                 let mut var = var_ref.borrow_mut();
 
                 var.color = Color::GRAY;
@@ -210,14 +212,18 @@ pub fn emd(
                     panic!("Failed");
                 }
 
-                if let Some(cursor_value) = var.cursor {
-                    for i in (0..=cursor_value).rev() {
-                        let adj_var = var.adjacency[i].borrow();
-                        if adj_var.color == Color::WHITE {
-                            adj_cursor = Some(i);
-                            break;
+                let mut adj_cursor: Option<usize> = None;
+                match var.cursor {
+                    Some(ref cursor_value) => {
+                        for i in (0..=*cursor_value).rev() {
+                            let adj_var = var.adjacency[i].borrow();
+                            if adj_var.color == Color::WHITE {
+                                adj_cursor = Some(i);
+                                break;
+                            }
                         }
-                    }
+                    },
+                    None => {},
                 }
                 if let Some(adj_cursor_value) = adj_cursor {
                     if adj_cursor_value > 0 {
@@ -262,7 +268,6 @@ pub fn emd(
             }
         }
 
-        let mut is_optimal = false;
         for i in 0..b {
             let basic = basis[i].borrow();
             // If the pivot variable is any of the
@@ -271,12 +276,11 @@ pub fn emd(
             // min_slack = 0.0 explicitly to avoid
             if basic.row == min_row && basic.col == min_col {
                 min_slack = 0.0;
-                is_optimal = true;
                 break;
             }
         }
 
-        if min_slack >= -EPSILON || is_optimal {
+        if min_slack >= -EPSILON {
             break;
         }
 
@@ -295,28 +299,32 @@ pub fn emd(
                 var.color = Color::GRAY;
                 
                 let mut adj_cursor: Option<usize> = None;
-                if let Some(cursor_value) = var.cursor {
-                    for i in (0..=cursor_value).rev() {
-                        let adj_var = var.adjacency[i].borrow();
-                        match adj_var.back {
-                            Some(ref back_value) => {
-                                let back_var = back_value.borrow();
-                                if back_var.row == adj_var.row || back_var.col == adj_var.col {
-                                    continue;
-                                }
-                            },
-                            None => {},
+                
+                match var.cursor {
+                    Some(ref cursor_value) => {
+                        for i in (0..=*cursor_value).rev() {
+                            let adj_var = var.adjacency[i].borrow();
+                            match adj_var.back {
+                                Some(ref back_value) => {
+                                    let back_var = back_value.borrow();
+                                    if back_var.row == adj_var.row || back_var.col == adj_var.col {
+                                        continue;
+                                    }
+                                },
+                                None => {},
+                            }
+                            if adj_var.id == root_id {
+                                // Found a cycle
+                                adj_cursor = Some(i);
+                                break;
+                            }
+                            if adj_var.color == Color::WHITE {
+                                adj_cursor = Some(i);
+                                break;
+                            }
                         }
-                        if adj_var.id == root_id {
-                            // Found a cycle
-                            adj_cursor = Some(i);
-                            break;
-                        }
-                        if adj_var.color == Color::WHITE {
-                            adj_cursor = Some(i);
-                            break;
-                        }
-                    }
+                    },
+                    None => {},
                 }
                 if let Some(adj_cursor_value) = adj_cursor {
                     let is_gray: bool;
@@ -428,7 +436,7 @@ pub fn emd(
                     },
                 }
             }
-            
+            loop_var_ref = update_var_ref;
         }
 
         // Remove the basic variable that went to zero
@@ -484,8 +492,8 @@ mod tests {
         let y = vec![3., 5.];
         assert_eq!(distance(&x, &y), 0.5);
 
-        let x = vec![4., 3.];
-        let y = vec![3., 5., 3., 2.];
-        assert_eq!(distance(&x, &y), 0.75);
+        let x = vec![2., 4.];
+        let y = vec![3., 5.];
+        assert_eq!(distance(&x, &y), 1.);
     }
 }
