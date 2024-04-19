@@ -165,13 +165,15 @@ fn remove_basic(basis: &mut Basis, index: usize, node_ref: &BasicRef) {
 
         if let Some(remove_index_value) = remove_index {
             // Remove the node
-            adj_node.adjacency.remove(remove_index_value);
-            for i in remove_index_value..(adj_node.adjacency.len() - 1) {
-                adj_node.adjacency[i] = Rc::clone(&adj_node.adjacency[i + 1]);
+            if adj_node.adjacency.len() > 1 {
+                // You can just pop the only element when there is a single node.
+                // Handle when there are more than one node.
+                adj_node.adjacency.remove(remove_index_value);
+                for i in remove_index_value..(adj_node.adjacency.len() - 1) {
+                    adj_node.adjacency[i] = Rc::clone(&adj_node.adjacency[i + 1]);
+                }
             }
             adj_node.adjacency.pop();
-        } else {
-            panic!("Must have the node");
         }
     }
 
